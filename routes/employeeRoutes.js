@@ -43,7 +43,7 @@ const router = express.Router();
 router.post('/login', loginEmployee);
 
 // HR Manager creation (protected)
-router.post('/hr/create' , createHRManager);
+router.post('/hr/create', authenticateToken, requireHRManager, createHRManager);
 
 // Protected routes
 
