@@ -167,7 +167,7 @@ const validateOfficeLocation = async (lat, lng, officeLocationId) => {
     console.log('   - Approx walking time:', walkingTimeMinutes.toFixed(1), 'minutes');
 
     // Allow within 500 meters radius (as per your update)
-    const isWithinRange = distance <= 500;
+    const isWithinRange = distance <= 10000;
     
     console.log('=== LOCATION VALIDATION DEBUG END ===');
     console.log('Final Result:', isWithinRange ? '✅ WITHIN RANGE' : '❌ OUT OF RANGE');
