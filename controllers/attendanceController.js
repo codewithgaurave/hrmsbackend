@@ -86,28 +86,97 @@ const calculateDayStatus = async (employee, date) => {
 // Validate if employee is within office location radius
 const validateOfficeLocation = async (lat, lng, officeLocationId) => {
   try {
+    console.log('=== LOCATION VALIDATION DEBUG START ===');
+    console.log('1. Input Parameters:');
+    console.log('   - User Latitude:', lat);
+    console.log('   - User Longitude:', lng);
+    console.log('   - Office Location ID:', officeLocationId);
+    console.log('   - User Lat/Lng Type:', typeof lat, typeof lng);
+
+    // Validate input parameters
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      console.log('ERROR: Invalid coordinates type. Expected numbers.');
+      console.log('   Lat is:', lat, 'Type:', typeof lat);
+      console.log('   Lng is:', lng, 'Type:', typeof lng);
+      return false;
+    }
+
+    if (isNaN(lat) || isNaN(lng)) {
+      console.log('ERROR: Coordinates are NaN');
+      return false;
+    }
+
     const office = await OfficeLocation.findById(officeLocationId);
 
-    if (!office) return false;
+    if (!office) {
+      console.log('ERROR: Office location not found with ID:', officeLocationId);
+      return false;
+    }
+
+    console.log('2. Office Location Details:');
+    console.log('   - Office Name:', office.officeName);
+    console.log('   - Office Latitude:', office.latitude);
+    console.log('   - Office Longitude:', office.longitude);
+    console.log('   - Office Address:', office.officeAddress);
+    console.log('   - Office Lat/Lng Type:', typeof office.latitude, typeof office.longitude);
+
+    // Check if office coordinates are valid numbers
+    if (typeof office.latitude !== 'number' || typeof office.longitude !== 'number') {
+      console.log('ERROR: Office coordinates are not numbers');
+      console.log('   Office lat type:', typeof office.latitude, 'value:', office.latitude);
+      console.log('   Office lng type:', typeof office.longitude, 'value:', office.longitude);
+      return false;
+    }
+
+    if (isNaN(office.latitude) || isNaN(office.longitude)) {
+      console.log('ERROR: Office coordinates are NaN');
+      return false;
+    }
 
     // Calculate distance between two points using Haversine formula
     const R = 6371000; // Earth's radius in meters
     const dLat = (lat - office.latitude) * Math.PI / 180;
     const dLng = (lng - office.longitude) * Math.PI / 180;
 
+    console.log('3. Distance Calculation:');
+    console.log('   - dLat (radians):', dLat);
+    console.log('   - dLng (radians):', dLng);
+
     const a =
       Math.sin(dLat / 2) * Math.sin(dLat / 2) +
       Math.cos(office.latitude * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
       Math.sin(dLng / 2) * Math.sin(dLng / 2);
 
+    console.log('   - a value:', a);
+
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     const distance = R * c; // Distance in meters
 
-    // Allow within 100 meters radius
-    return distance <= 500;
+    console.log('4. Result:');
+    console.log('   - Calculated distance:', distance.toFixed(2), 'meters');
+    console.log('   - Maximum allowed distance: 500 meters');
+    console.log('   - Is within range?', distance <= 500);
+    console.log('   - Distance difference:', (distance - 500).toFixed(2), 'meters');
+
+    // Convert distance to kilometers for better understanding
+    const distanceKm = distance / 1000;
+    console.log('   - Distance in kilometers:', distanceKm.toFixed(3), 'km');
+
+    // Calculate approximate walking time (5 km/h average)
+    const walkingTimeMinutes = (distance / 5000) * 60;
+    console.log('   - Approx walking time:', walkingTimeMinutes.toFixed(1), 'minutes');
+
+    // Allow within 500 meters radius (as per your update)
+    const isWithinRange = distance <= 500;
+    
+    console.log('=== LOCATION VALIDATION DEBUG END ===');
+    console.log('Final Result:', isWithinRange ? '✅ WITHIN RANGE' : '❌ OUT OF RANGE');
+    
+    return isWithinRange;
 
   } catch (error) {
     console.error("Location validation error:", error);
+    console.error("Error stack:", error.stack);
     return false;
   }
 };
