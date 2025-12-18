@@ -104,7 +104,7 @@ const validateOfficeLocation = async (lat, lng, officeLocationId) => {
     const distance = R * c; // Distance in meters
 
     // Allow within 100 meters radius
-    return distance <= 100;
+    return distance <= 500;
 
   } catch (error) {
     console.error("Location validation error:", error);
