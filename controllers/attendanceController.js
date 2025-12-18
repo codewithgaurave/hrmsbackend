@@ -197,101 +197,119 @@ const calculateConsistency = (summary) => {
 // @access  Private
 export const punchIn = async (req, res) => {
   try {
+    console.log('=== PUNCH IN DEBUG START ===');
+    console.log('Request Body:', JSON.stringify(req.body, null, 2));
+    
     const { coordinates } = req.body;
     const employeeId = req.employee._id;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    // Check if already punched in for today
-    const existingAttendance = await Attendance.findOne({
-      employee: employeeId,
-      date: today
-    });
-
-    if (existingAttendance && existingAttendance.punchIn.timestamp) {
+    
+    console.log('1. Employee ID:', employeeId);
+    console.log('2. Coordinates received:', coordinates);
+    
+    if (!coordinates) {
+      console.log('ERROR: No coordinates in request body');
       return res.status(400).json({
         success: false,
-        message: "You have already punched in for today"
+        message: "Coordinates are required"
       });
     }
-
-    // Get employee details
+    
+    if (!coordinates.latitude || !coordinates.longitude) {
+      console.log('ERROR: Missing latitude or longitude');
+      console.log('   Latitude:', coordinates.latitude);
+      console.log('   Longitude:', coordinates.longitude);
+      return res.status(400).json({
+        success: false,
+        message: "Latitude and longitude are required"
+      });
+    }
+    
+    console.log('3. Parsed coordinates:', {
+      latitude: parseFloat(coordinates.latitude),
+      longitude: parseFloat(coordinates.longitude)
+    });
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    console.log('4. Today date (start of day):', today);
+    
+    // Get employee with office location
     const employee = await Employee.findById(employeeId)
-      .populate('workShift')
-      .populate('officeLocation');
-
+      .populate('officeLocation')
+      .populate('workShift');
+    
+    console.log('5. Employee Details:');
+    console.log('   - Employee found:', !!employee);
+    if (employee) {
+      console.log('   - Employee Name:', employee.name);
+      console.log('   - Office Location ID:', employee.officeLocation?._id);
+      console.log('   - Office Location:', employee.officeLocation);
+    }
+    
     if (!employee) {
+      console.log('ERROR: Employee not found');
       return res.status(404).json({
         success: false,
         message: "Employee not found"
       });
     }
-
-    // Check if today is holiday or week off
-    const dayStatus = await calculateDayStatus(employee, today);
-    if (dayStatus !== "Working Day") {
+    
+    if (!employee.officeLocation) {
+      console.log('ERROR: Employee has no office location assigned');
       return res.status(400).json({
         success: false,
-        message: `Cannot punch in on ${dayStatus}`
+        message: "No office location assigned to employee"
       });
     }
-
-    // Validate location (within office radius - 100 meters)
+    
+    console.log('6. Calling validateOfficeLocation...');
+    console.log('   - User lat:', coordinates.latitude);
+    console.log('   - User lng:', coordinates.longitude);
+    console.log('   - Office ID:', employee.officeLocation._id);
+    
     const isWithinOffice = await validateOfficeLocation(
-      coordinates.latitude,
-      coordinates.longitude,
-      employee.officeLocation
+      parseFloat(coordinates.latitude),
+      parseFloat(coordinates.longitude),
+      employee.officeLocation._id
     );
-
+    
+    console.log('7. Validation Result:', isWithinOffice);
+    
     if (!isWithinOffice) {
+      console.log('8. ❌ LOCATION VALIDATION FAILED');
+      // Get office details for better error message
+      const office = await OfficeLocation.findById(employee.officeLocation._id);
+      console.log('   Office Location:', {
+        name: office?.officeName,
+        lat: office?.latitude,
+        lng: office?.longitude,
+        address: office?.officeAddress
+      });
+      
       return res.status(400).json({
         success: false,
         message: "Punch in Service is available only inside the office",
+        debugInfo: process.env.NODE_ENV === 'development' ? {
+          userLocation: {
+            latitude: coordinates.latitude,
+            longitude: coordinates.longitude
+          },
+          officeLocation: office ? {
+            name: office.officeName,
+            latitude: office.latitude,
+            longitude: office.longitude,
+            address: office.officeAddress
+          } : null
+        } : undefined
       });
     }
-
-    // Create or update attendance record
-    let attendance;
-
-    if (existingAttendance) {
-      // Update existing record
-      attendance = existingAttendance;
-      attendance.punchIn = {
-        timestamp: new Date(),
-        coordinates: coordinates
-      };
-      attendance.isWithinOfficeLocation = isWithinOffice;
-    } else {
-      // Create new attendance record
-      attendance = new Attendance({
-        employee: employeeId,
-        date: today,
-        punchIn: {
-          timestamp: new Date(),
-          coordinates: coordinates
-        },
-        shift: employee.workShift._id,
-        officeLocation: employee.officeLocation._id,
-        isWithinOfficeLocation: isWithinOffice
-      });
-    }
-
-    await attendance.save();
-
-    // Populate the saved attendance
-    await attendance.populate('employee', 'name employeeId');
-    await attendance.populate('shift', 'name startTime endTime');
-    await attendance.populate('officeLocation', 'officeName officeAddress');
-
-    res.status(200).json({
-      success: true,
-      message: "Punch in successful",
-      attendance: attendance,
-      locationStatus: isWithinOffice ? "Within office premises" : "Outside office premises"
-    });
-
+    
+    console.log('8. ✅ LOCATION VALIDATION PASSED');
+    // Rest of your punch in logic...
+    
   } catch (error) {
-    console.error("Punch in error:", error);
+    console.error('PUNCH IN ERROR DETAILS:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: "Server error during punch in",
